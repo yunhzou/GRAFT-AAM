@@ -887,9 +887,17 @@ def _generate_seed_orders(g_R, n_trials, rng_seed=42,
 
     ``distance`` changes only the trial anchors: sample without replacement
     with weight 1 + distance to the nearest previously selected anchor. An
-    unreachable atom has distance len(graph). The rest of each order retains
-    the original shuffle. Selection is adaptive to anchors, never to search
-    results, and adds O(n_trials * (vertices + edges)) preprocessing.
+    unreachable atom has distance len(graph). Selection is adaptive to
+    anchors, never to search results, and adds O(n_trials * (vertices +
+    edges)) preprocessing.
+
+    All trials draw from ONE shuffled pool. Trial ``idx`` uses the pool
+    rotated to start after position ``idx`` (minus its anchor), so the seed
+    that follows the first locked island differs across trials instead of
+    being an independent re-shuffle that can repeat the same atom. With
+    ``n_trials`` <= atoms, every atom appears exactly once at each position.
+    Orders depend only on ``idx`` and ``rng_seed``, so prefixes are stable
+    when ``n_trials`` grows.
     """
     if seed_selection not in ('random', 'distance'):
         raise ValueError('unknown seed selection policy')
@@ -934,13 +942,12 @@ def _generate_seed_orders(g_R, n_trials, rng_seed=42,
                         frontier.append(neighbor)
             for node in remaining:
                 nearest[node] = min(nearest[node], distances.get(node, len(nodes)))
-        rest = [
-            n for n in _ordered_seed_nodes(
-                g_R,
-                random.Random(rng_seed + idx + 1),
-                common_element_threshold=common_element_threshold,
-            )
-            if n != anchor
-        ]
+        # Shared pool, rotated per trial: no independent re-shuffle, so the
+        # next seed after the anchor is drawn without replacement across trials.
+        shift = (idx + 1) % len(nodes)
+        rotated = [n for n in nodes[shift:] + nodes[:shift] if n != anchor]
+        # Isolated ambiguous atoms stay behind contextual atoms.
+        rest = ([n for n in rotated if not ambiguous_isolated(n)]
+                + [n for n in rotated if ambiguous_isolated(n)])
         orders.append([anchor] + rest)
     return orders

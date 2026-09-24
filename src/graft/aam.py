@@ -56,7 +56,7 @@ def checkpoint_manifest(problem, config):
     if config.seed_selection == 'random':
         settings.pop('seed_selection')  # unchanged policy can resume older cuts
     return json.loads(json.dumps(dict(schema='rxn_core.aam_checkpoints/v2',
-        seed_policy='independent_per_cut_blake2b_v1',
+        seed_policy='independent_per_cut_blake2b_v2_shared_pool',
         reactant=endpoint(problem.reactant),product=endpoint(problem.product),
         config=settings)))
 
